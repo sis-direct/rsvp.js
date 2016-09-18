@@ -1,7 +1,6 @@
 /*global describe, specify, it, assert */
 
-var g = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : this;
-var RSVP = g.adapter.RSVP;
+var RSVP = new Function('return this;')().adapter.RSVP;
 var assert = require('assert');
 
 function objectEquals(obj1, obj2) {
@@ -53,6 +52,24 @@ describe('tampering', function() {
       });
     });
 
+  it('tampered resolved', function() {
+      var one = RSVP.Promise.resolve(1);
+      var two = RSVP.Promise.resolve(2);
+      var thenCalled = 0;
+      var resolveCalled = 0;
+
+      RSVP.Promise.resolve = function(x) {
+        resolveCalled++;
+        return new RSVP.Promise(function(resolve) { resolve(x); });
+      };
+
+      return one.then(function() {
+        return two;
+      }).then(function(value) {
+        assert.equal(resolveCalled, 0, 'expected resolve to be called once');
+        assert.equal(value, 2, 'expected fulfillment value to be 2');
+      });
+    });
     describe('Promise.all', function() {
       it('tampered resolved and then', function() {
         var two = RSVP.Promise.resolve(2);
@@ -2407,6 +2424,32 @@ describe("RSVP extensions", function() {
       ];
 
       RSVP.filter(promises, filterFn).then(function(results){
+        assert.deepEqual([2, 3], results);
+        done();
+      },function(reason) {
+        done(reason);
+      });
+    });
+
+    it("works with promise that returns an array", function(done){
+      var promise = RSVP.resolve([1,2,3]);
+
+      RSVP.filter(promise, filterFn).then(function(results){
+        assert.deepEqual([2, 3], results);
+        done();
+      },function(reason) {
+        done(reason);
+      });
+    });
+
+    it("works with promise that returns an array of promises", function(done){
+      var promise = RSVP.resolve([
+        RSVP.resolve(1),
+        RSVP.resolve(2),
+        RSVP.resolve(3)
+      ]);
+
+      RSVP.filter(promise, filterFn).then(function(results){
         assert.deepEqual([2, 3], results);
         done();
       },function(reason) {
